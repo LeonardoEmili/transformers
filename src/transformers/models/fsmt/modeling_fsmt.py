@@ -1226,14 +1226,19 @@ class SinusoidalPositionalEmbedding(nn.Embedding):
 
     def __init__(self, num_positions, embedding_dim, padding_idx):
         super().__init__(num_positions, embedding_dim, padding_idx)
+        # The weight is deterministic, so store it as a non-persistent buffer
+        # so it is never saved in checkpoints (avoids size-mismatch errors on load).
+        # Use get_embedding() rather than self.weight.data so we always get a real
+        # CPU tensor — self.weight may be a meta tensor under init_empty_weights().
+        weight = self.get_embedding(num_positions, embedding_dim, padding_idx)
+        del self._parameters["weight"]
+        self.register_buffer("weight", weight, persistent=False)
 
     def make_weight(self, num_positions, embedding_dim, padding_idx):
         weight = self.get_embedding(num_positions, embedding_dim, padding_idx)
-        # in forward put the weights on the correct dtype and device of the param
+        # in forward put the weights on the correct dtype and device of the buffer
         weight = weight.to(dtype=self.weight.dtype, device=self.weight.device)
-        self.weight = nn.Parameter(weight)
-        self.weight.detach_()
-        self.weight.requires_grad = False
+        self.register_buffer("weight", weight, persistent=False)
 
     @staticmethod
     def get_embedding(num_embeddings, embedding_dim, padding_idx):
