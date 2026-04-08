@@ -1234,11 +1234,9 @@ class SinusoidalPositionalEmbedding(nn.Embedding):
         del self._parameters["weight"]
         self.register_buffer("weight", weight, persistent=False)
 
-    def make_weight(self, num_positions, embedding_dim, padding_idx):
+    def expand_weight(self, num_positions, embedding_dim, padding_idx):
         weight = self.get_embedding(num_positions, embedding_dim, padding_idx)
-        # in forward put the weights on the correct dtype and device of the buffer
-        weight = weight.to(dtype=self.weight.dtype, device=self.weight.device)
-        self.register_buffer("weight", weight, persistent=False)
+        self._buffers["weight"] = weight.to(dtype=self.weight.dtype, device=self.weight.device)
 
     @staticmethod
     def get_embedding(num_embeddings, embedding_dim, padding_idx):
@@ -1285,7 +1283,7 @@ class SinusoidalPositionalEmbedding(nn.Embedding):
         max_pos = self.padding_idx + 1 + seq_len
         if max_pos > self.weight.size(0):
             # expand embeddings if needed
-            self.make_weight(max_pos, self.embedding_dim, self.padding_idx)
+            self.expand_weight(max_pos, self.embedding_dim, self.padding_idx)
         positions = self.make_positions(input, self.padding_idx)
         return super().forward(positions)
 
